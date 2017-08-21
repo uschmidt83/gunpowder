@@ -6,7 +6,8 @@ from scipy.spatial import KDTree
 from gunpowder.nodes.batch_filter import BatchFilter
 from gunpowder.volume import Volume
 from gunpowder.coordinate import Coordinate
-from gunpowder.points import enlarge_binary_map
+from gunpowder.points import Points, Point, DDA3, enlarge_binary_map
+from gunpowder.volume import VolumeType
 
 logger = logging.getLogger(__name__)
 
@@ -15,34 +16,33 @@ class AddVectorMap(BatchFilter):
         ''' Creates a vector map of shape [dim_vector, [shape_of_volume]] (e.g. [3, 50,50,50] for a volume of
             shape (50,50,50)) where every voxel which is close to a any source point location has a vector which points to
             one of the source point location's target location.
-            Close to a point location in src_point includes all voxels which 
+            Close to a point location in src_point includes all voxels which
                 1) lie within distance radius_phys of the considered src point location
                 2) (if stayinside_volumeTypes is not None), lie within the same segment as the src location in the
                     mask provided in stayinside_volumetype.
             The partner_criterion decides to which target location of the source point location that the vector of a
             voxel points (the different criterions are described below).
-        
         Args:
             src_and_trg_points (dict):      Dictionary from :class:``VolumeType`` of the vector map to be created
                                             to a tuple (:class:``PointsTypes`` of the source points, :class:``PointsTypes``
                                             of the target points) which define the source and target points.
-            stayinside_volumetypes (dict):  Dictionary from :class:``VolumeTypes`` of the vector map to be created to 
-                                            :class:``VolumeTypes`` of the stayinside_volume. 
+            stayinside_volumetypes (dict):  Dictionary from :class:``VolumeTypes`` of the vector map to be created to
+                                            :class:``VolumeTypes`` of the stayinside_volume.
                                             The stayinside_volume is assumed to contain discrete objects labeled with
                                             different object ids. The object id at the specific source location is used
-                                            to restrict the region where vectors are created around a source location. 
+                                            to restrict the region where vectors are created around a source location.
                                             Voxels that are located outside of this object are set to zero.
-                                            If stayinside_volumetypes is None, all the voxels within distance 
+                                            If stayinside_volumetypes is None, all the voxels within distance
                                             radius_phys to the source location receive a vector.
             pad_for_partners (tuple):       n-dim tuple which defines padding of trg_points request in all dimensions
                                             (in world units).
-                                            This might be used s.t. also partner locations which lie within the padded 
+                                            This might be used s.t. also partner locations which lie within the padded
                                             region, hence slightly outside of the vector map's roi, are considered.
             radius_phys (int):              Radius (in world units) to restrict region where vectors are created around
                                             a source location.
             partner_criterion(str):         'min_distance' or 'all'
                                             'min_distance': the vectors of all the voxels around a source location
-                                            point to the same target location, namely the location which has the 
+                                            point to the same target location, namely the location which has the
                                             minimal distance to the considered source location.
                                             'all': all partner locations of a given source location are considered.
                                             The region around a source location is split up into (num_partners)-subregions
@@ -68,34 +68,42 @@ class AddVectorMap(BatchFilter):
                 assert points_type in self.spec.points, "Asked for {} in AddVectorMap from {}, where {} is not provided.".\
                                                                 format(volume_type, points_type, points_type)
             neg_pad_for_partners = Coordinate((self.pad_for_partners*np.asarray([-1])).tolist())
-            self.spec.volumes[volume_type] = self.spec.points[src_points_type].grow(neg_pad_for_partners, neg_pad_for_partners)
+            if type(volume_type) == VolumeType:
+                self.spec.volumes[volume_type] = self.spec.points[src_points_type].grow(neg_pad_for_partners, neg_pad_for_partners)
+            else:
+                self.spec.points[volume_type] = self.spec.points[src_points_type].grow(neg_pad_for_partners,
+                                                                                        neg_pad_for_partners)
 
     def get_spec(self):
         return self.spec
 
     def prepare(self, request):
-
         if len(self.volume_to_src_trg_points) == 0:
             self.skip_next = True
 
         self.skip_next = True
         for (volume_type, (src_points_type, trg_points_type)) in self.volume_to_src_trg_points.items():
-            if volume_type in request.volumes:
+            if volume_type in request.volumes or volume_type in request.points:
+
+                if type(volume_type) == VolumeType:
+                    roi_of_request = request.volumes[volume_type]
+                    del request.volumes[volume_type]
+                else:
+                    roi_of_request = request.points[volume_type]
+                    del request.points[volume_type]
                 # increase or set request for points to be volume roi + padding for partners outside roi for target points
                 if src_points_type in request.points:
-                    if not request.points[src_points_type].contains(request.volumes[volume_type]):
-                        request.points[src_points_type] = request.volumes[volume_type]
+                    if not request.points[src_points_type].contains(roi_of_request):
+                        request.points[src_points_type] = roi_of_request
                 else:
-                    request.points[src_points_type] = request.volumes[volume_type]
+                    request.points[src_points_type] = roi_of_request
 
-                padded_roi = request.volumes[volume_type].grow((self.pad_for_partners), (self.pad_for_partners))
+                padded_roi = roi_of_request.grow((self.pad_for_partners), (self.pad_for_partners))
                 if trg_points_type in request.points:
                     if not request.points[trg_points_type].contains(padded_roi):
                         request.points[trg_points_type] = padded_roi
                 else:
                     request.points[trg_points_type] = padded_roi
-
-                del request.volumes[volume_type]
 
                 # at least one requested volume is in self.pointstypes_to_volumestypes, therefore do not skip process
                 self.skip_next = False
@@ -115,10 +123,23 @@ class AddVectorMap(BatchFilter):
             if volume_type in request.volumes:
                 vector_map = self.__get_vector_map(batch=batch, request=request, vector_map_volume_type=volume_type)
                 batch.volumes[volume_type] = Volume(data=vector_map, roi=request.volumes[volume_type])
+            if volume_type in request.points:
+                point_pairs = self.__get_point_pairs(batch, request, volume_type)
+                dummy_dict = {}
+                dummy_id = 0
+                for point1, point2 in point_pairs:
+                    interpolated_points = self.__interpolate_line(point1, point2)
+                    for single_point in interpolated_points:
+                        dummy_dict[dummy_id] = Point(location=single_point)
+                        dummy_id += 1
+
+
+                batch.points[volume_type] = Points(data=dummy_dict,
+                                                   roi=request.points[volume_type], resolution=(40, 4, 4))
 
         # restore request / remove not requested points in padding-for-neighbors region & shrink batch roi
         for (volume_type, (src_points_type, trg_points_type)) in self.volume_to_src_trg_points.items():
-            if volume_type in request.volumes:
+            if volume_type in request.volumes or volume_type in request.points:
                 if trg_points_type in request.points:
                     for loc_id, point in batch.points[trg_points_type].data.items():
                         if not request.points[trg_points_type].contains(Coordinate(point.location)):
@@ -127,6 +148,23 @@ class AddVectorMap(BatchFilter):
                     batch.points[trg_points_type].roi = batch.points[trg_points_type].roi.grow(neg_pad_for_partners, neg_pad_for_partners)
                 elif trg_points_type in batch.points:
                     del batch.points[trg_points_type]
+
+    def __get_point_pairs(self, batch, request, collection_type):
+        src_points_type, trg_points_type = self.volume_to_src_trg_points[collection_type]
+        point_pairs = []
+        for (loc_id, point) in batch.points[src_points_type].data.items():
+            if request.points[collection_type].contains(Coordinate(point.location)):
+                relevant_partner_loc = self.__get_relevant_partner_locations(batch, point, trg_points_type)
+                for partner in relevant_partner_loc:
+                    point_pairs.append((point.location, partner))
+        return point_pairs
+
+    def __interpolate_line(self, point1, point2):
+        dda = DDA3(point1, point2)
+        coord_on_line = dda.draw()
+        return coord_on_line
+
+
 
     def __get_vector_map(self, batch, request, vector_map_volume_type):
 
@@ -140,7 +178,6 @@ class AddVectorMap(BatchFilter):
             return vector_map_total
 
         for (loc_id, point) in batch.points[src_points_type].data.items():
-
             if request.volumes[vector_map_volume_type].contains(Coordinate(point.location)):
 
                 # get all partner locations which should be considered
@@ -161,7 +198,6 @@ class AddVectorMap(BatchFilter):
                     locations_to_fill_vx       = np.reshape(np.nonzero(considered_region_mask), [dim_vectors, -1]).T
                     locations_to_fill_abs_phys = (((locations_to_fill_vx + clipped_offset_vx_considered_mask)*voxel_size_vm)
                                                   + offset_vector_map_phys).tolist()
-
                     #check for target point with largest distance first and add vector pointing to it to vector_map_total
                     num_src_vectors_per_trg_loc = len(locations_to_fill_abs_phys) // len(relevant_partner_loc)
                     if num_src_vectors_per_trg_loc > 0:
@@ -174,12 +210,10 @@ class AddVectorMap(BatchFilter):
                             if nr == len(relevant_partner_loc)-1:
                                 num_src_vectors_per_trg_loc = len(locations_to_fill_abs_phys)
                             distances, ids = kdtree_locs_vector_map.query(trg_loc_abs_phys, k=num_src_vectors_per_trg_loc)
-
                             try:
                                 len(ids)
                             except TypeError:
                                 ids = [ids]
-
                             for src_voxel_id in ids:
                                 # remove point from list which are taken as neighbors of THIS target location
                                 neighbor_loc_abs_phys = kdtree_locs_vector_map.data[src_voxel_id]

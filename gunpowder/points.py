@@ -2,6 +2,7 @@ from .freezable import Freezable
 import logging
 import numpy as np
 from scipy.ndimage.morphology import distance_transform_edt
+import operator
 
 logger = logging.getLogger(__name__)
 
@@ -211,10 +212,28 @@ class RasterizationSetting(Freezable):
         self.invert_map = invert_map
         self.freeze()
 
+def dda_round(x):
+    return (x + 0.5).astype(int)
 
+class DDA3:
+    def __init__(self, start, end, scaling=np.array([1, 1, 1])):
+        assert np.array_equal(start - np.floor(start), np.zeros(len(start)))
+        assert np.array_equal(end - np.floor(end), np.zeros(len(end)))
 
+        self.start = (start * scaling).astype(float)
+        self.end = (end * scaling).astype(float)
+        self.line = [dda_round(self.start)]
 
+        self.max_direction, self.max_length = max(enumerate(abs(self.end - self.start)), key=operator.itemgetter(1))
+        self.dv = (self.end - self.start) / self.max_length
 
+    def draw(self):
+        for step in range(int(self.max_length)):
+            self.line.append(dda_round((step + 1) * self.dv + self.start))
+        for n in xrange(len(self.line) - 1):
+            assert (np.linalg.norm(self.line[n + 1] - self.line[n]) <= np.sqrt(3))
+
+        return self.line
 
 
 
