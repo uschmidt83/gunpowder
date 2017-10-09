@@ -5,6 +5,7 @@ from .provider_spec import ProviderSpec
 from .roi import Roi
 from .volume import VolumeType
 from .volume_spec import VolumeSpec
+from .coordinate import Coordinate
 
 class BatchRequest(ProviderSpec):
     '''A collection of (possibly partial) :class:`VolumeSpec`s and
@@ -13,7 +14,7 @@ class BatchRequest(ProviderSpec):
     For usage, see the documentation of :class:`ProviderSpec`.
     '''
 
-    def add(self, identifier, shape, voxel_size=None):
+    def add_centered(self, identifier, shape, voxel_size=None):
         '''Convenience method to add a volume or point spec by providing only
         the shape of a ROI (in world units).
 
@@ -28,6 +29,7 @@ class BatchRequest(ProviderSpec):
 
             voxel_size: A tuple contening the voxel sizes for each corresponding dimension
         '''
+        assert isinstance(shape, Coordinate), "Provided shape should be of class Coordinate"
 
         if isinstance(identifier, VolumeType):
             spec = VolumeSpec()
@@ -56,7 +58,6 @@ class BatchRequest(ProviderSpec):
             return
 
         center = total_roi.get_center()
-
         for specs_type in [self.volume_specs, self.points_specs]:
             for identifier in specs_type:
                 roi = specs_type[identifier].roi
