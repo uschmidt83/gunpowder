@@ -14,6 +14,32 @@ class BatchRequest(ProviderSpec):
     For usage, see the documentation of :class:`ProviderSpec`.
     '''
 
+    def add(self, identifier, roi):
+        '''Convenience method to add a volume or point spec by providing only
+        the shape of a ROI (in world units).
+
+        A ROI with zero-offset will be generated. If more than one request is
+        added, the ROIs with smaller shapes will be shifted to be centered in
+        the largest one.
+
+        Args:
+            identifier: A :class:`VolumeType` or `PointsType` instance to refer to the output.
+
+            roi: A roi of the desired data
+        '''
+        assert isinstance(roi, Roi), "Provided roi arg is not of class Roi"
+
+        if isinstance(identifier, VolumeType):
+            spec = VolumeSpec()
+        elif isinstance(identifier, PointsType):
+            spec = PointsSpec()
+        else:
+            raise RuntimeError("Only VolumeType or PointsType can be added.")
+
+        spec.roi = roi
+        self[identifier] = spec
+
+
     def add_centered(self, identifier, shape, voxel_size=None):
         '''Convenience method to add a volume or point spec by providing only
         the shape of a ROI (in world units).
