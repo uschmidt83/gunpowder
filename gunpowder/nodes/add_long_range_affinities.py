@@ -12,13 +12,14 @@ class AddLongRangeAffinities(BatchFilter):
 
 
     def __init__(self, affinity_vectors, volume_type_1=None, volume_type_2=None,
-        affinity_volume_type_1=None, affinity_volume_type_2=None):
+        affinity_volume_type_1=None, affinity_volume_type_2=None, output_with_IDs = False):
 
         self.volume_type_1 = volume_type_1
         self.volume_type_2 = volume_type_2
         self.affinity_volume_type_1 = affinity_volume_type_1
         self.affinity_volume_type_2 = affinity_volume_type_2
         self.affinity_vectors = affinity_vectors
+        self.output_with_IDs = output_with_IDs
 
         if volume_type_1 is None:
             self.volume_type_1 = VolumeTypes.PRESYN
@@ -88,68 +89,69 @@ class AddLongRangeAffinities(BatchFilter):
 
     def process(self, batch, request):
 
-        full_vol1 = batch.volumes[self.volume_type_1]
-        full_vol2 = batch.volumes[self.volume_type_2]
+        if not self.skip_next:
+            full_vol1 = batch.volumes[self.volume_type_1]
+            full_vol2 = batch.volumes[self.volume_type_2]
 
-        # Both full_vol1 should match
-        assert full_vol1.spec.dtype == full_vol2.spec.dtype,\
-        "data type of volume 1(%s) and volume 2(%s) should match"%\
-        (full_vol1.spec.dtype, full_vol2.spec.dtype)
+            # Both full_vol1 should match
+            assert full_vol1.spec.dtype == full_vol2.spec.dtype,\
+            "data type of volume 1(%s) and volume 2(%s) should match"%\
+            (full_vol1.spec.dtype, full_vol2.spec.dtype)
 
-        assert full_vol1.spec.voxel_size == full_vol2.spec.voxel_size,\
-        "data type of volume 1(%s) and volume 2(%s) should match"%\
-        (full_vol1.spec.voxel_size,full_vol2.spec.voxel_size)
+            assert full_vol1.spec.voxel_size == full_vol2.spec.voxel_size,\
+            "data type of volume 1(%s) and volume 2(%s) should match"%\
+            (full_vol1.spec.voxel_size,full_vol2.spec.voxel_size)
 
-        # do nothing if no gt affinities were requested
-        if self.skip_next:
-            self.skip_next = False
-            return
+            # do nothing if no gt affinities were requested
+            if self.skip_next:
+                self.skip_next = False
+                return
 
-        logger.debug("computing ground-truth affinities from labels")
+            logger.debug("computing ground-truth affinities from labels")
 
-        # Calculate affinities 1: from vol2 onto vol1
+            # Calculate affinities 1: from vol2 onto vol1
 
-        # Initialize affinity map
-        request_vol = request[self.affinity_volume_type_1]
-        affinity_map = np.zeros(
-            (len(self.affinity_vectors),) +
-            tuple(request_vol.roi.get_shape()/request_vol.voxel_size), dtype=full_vol1.spec.dtype)
+            # Initialize affinity map
+            request_vol = request[self.affinity_volume_type_1]
+            affinity_map = np.zeros(
+                (len(self.affinity_vectors),) +
+                tuple(request_vol.roi.get_shape()/request_vol.voxel_size), dtype=full_vol1.spec.dtype)
 
-        # calculate affinities
-        vol1 = full_vol1.crop(request_vol.roi)
-        for i, vector in enumerate(self.affinity_vectors):
-            vol2 = full_vol2.crop(request_vol.roi.shift(tuple(-vector)))
-            affinity_map[i,:,:,:] = np.bitwise_and(vol1.data, vol2.data)
-
-
-        batch.volumes[self.affinity_volume_type_1] = Volume(affinity_map,
-            spec=request[self.affinity_volume_type_1].copy())
-
-        batch.volumes[self.affinity_volume_type_1].attrs['affinity_vectors'] =\
-         self.affinity_vectors
-
-        # Calculate affinities 2: from vol1 onto vol2
-
-        # Initialize affinity map
-        request_vol = request[self.affinity_volume_type_2]
-        affinity_map = np.zeros(
-            (len(self.affinity_vectors),) +
-            tuple(request_vol.roi.get_shape()/request_vol.voxel_size), dtype=full_vol1.spec.dtype)
-
-        # calculate affinities
-        vol2 = full_vol2.crop(request_vol.roi)
-        for i, vector in enumerate(self.affinity_vectors):
-            vol1 = full_vol1.crop(request_vol.roi.shift(tuple(vector)))
-            affinity_map[i,:,:,:] = np.bitwise_and(vol1.data, vol2.data)
+            # calculate affinities
+            vol1 = full_vol1.crop(request_vol.roi)
+            for i, vector in enumerate(self.affinity_vectors):
+                vol2 = full_vol2.crop(request_vol.roi.shift(tuple(-vector)))
+                affinity_map[i,:,:,:] = np.bitwise_and(vol1.data, vol2.data)
 
 
-        batch.volumes[self.affinity_volume_type_2] = Volume(affinity_map,
-            spec=request[self.affinity_volume_type_2].copy())
+            batch.volumes[self.affinity_volume_type_1] = Volume(affinity_map,
+                spec=request[self.affinity_volume_type_1].copy())
 
-        batch.volumes[self.affinity_volume_type_2].attrs['affinity_vectors'] =\
-         self.affinity_vectors
+            batch.volumes[self.affinity_volume_type_1].attrs['affinity_vectors'] =\
+             self.affinity_vectors
 
+            # Calculate affinities 2: from vol1 onto vol2
 
+            # Initialize affinity map
+            request_vol = request[self.affinity_volume_type_2]
+            affinity_map = np.zeros(
+                (len(self.affinity_vectors),) +
+                tuple(request_vol.roi.get_shape()/request_vol.voxel_size), dtype=full_vol1.spec.dtype)
+
+            # calculate affinities
+            vol2 = full_vol2.crop(request_vol.roi)
+            for i, vector in enumerate(self.affinity_vectors):
+                vol1 = full_vol1.crop(request_vol.roi.shift(tuple(vector)))
+                affinity_map[i,:,:,:] = np.bitwise_and(vol1.data, vol2.data)
+
+            if not self.output_with_IDs:
+                affinity_map[np.where(affinity_map != 0)] = 1
+
+            batch.volumes[self.affinity_volume_type_2] = Volume(affinity_map,
+                spec=request[self.affinity_volume_type_2].copy())
+
+            batch.volumes[self.affinity_volume_type_2].attrs['affinity_vectors'] =\
+             self.affinity_vectors
 
         # Crop all other requests
         for volume_type, volume in request.volume_specs.items():
