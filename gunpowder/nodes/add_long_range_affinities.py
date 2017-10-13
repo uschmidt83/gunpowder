@@ -32,7 +32,6 @@ class AddLongRangeAffinities(BatchFilter):
         self.skip_next = False
 
 
-
     def setup(self):
         assert self.volume_type_1 in self.spec, "Upstream does not provide %s needed by \
         AddGtAffinities"%self.volume_type_1
@@ -47,7 +46,8 @@ class AddLongRangeAffinities(BatchFilter):
 
         # get maximum offset in each dimension
         self.padding = np.max(np.abs(self.affinity_vectors), axis=0)
-        self.padding = tuple(round_to_voxel_size(self.padding, voxel_size))
+        self.padding = tuple(round_up_to_voxel_size(self.padding, voxel_size))
+
 
         logger.debug("padding neg: %s" %np.asarray(self.padding))
 
@@ -160,7 +160,7 @@ class AddLongRangeAffinities(BatchFilter):
             batch.points[points_type] = recropped
 
 
-def round_to_voxel_size(shape, voxel_size):
+def round_up_to_voxel_size(shape, voxel_size):
     voxel_size = np.asarray(voxel_size, dtype=float)
     shape = np.ceil(shape/voxel_size)*voxel_size
     return np.array(shape, dtype='int32')
