@@ -13,29 +13,29 @@ class Snapshot(BatchFilter):
 
     Args:
 
-        dataset_names (dict): A dictionary from :class:`VolumeType` to names of 
+        dataset_names (dict): A dictionary from :class:`VolumeType` to names of
             the datasets to store them in.
 
-        output_dir (string): The directory to save the snapshots. Will be 
+        output_dir (string): The directory to save the snapshots. Will be
             created, if it does not exist.
 
-        output_filename (string): Template for output filenames. '{id}' in the 
-            string will be replaced with the ID of the batch. '{iteration}' with 
+        output_filename (string): Template for output filenames. '{id}' in the
+            string will be replaced with the ID of the batch. '{iteration}' with
             the training iteration (if training was performed on this batch).
 
-        every (int): How often to save a batch. 'every=1' indicates that every 
-            batch will be stored, 'every=2' every second and so on. By default, 
+        every (int): How often to save a batch. 'every=1' indicates that every
+            batch will be stored, 'every=2' every second and so on. By default,
             every batch will be stored.
 
-        additional_request (:class:`BatchRequest`): An additional batch request 
-            to merge with the passing request, if a snapshot is to be made. If 
-            not given, only the volumes that are in the batch anyway are 
+        additional_request (:class:`BatchRequest`): An additional batch request
+            to merge with the passing request, if a snapshot is to be made. If
+            not given, only the volumes that are in the batch anyway are
             recorded.
 
-        compression_type (string or int): Compression strategy.  Legal values 
-            are 'gzip', 'szip', 'lzf'.  If an integer in range(10), this 
-            indicates gzip compression level. Otherwise, an integer indicates 
-            the number of a dynamically loaded compression filter. (See 
+        compression_type (string or int): Compression strategy.  Legal values
+            are 'gzip', 'szip', 'lzf'.  If an integer in range(10), this
+            indicates gzip compression level. Otherwise, an integer indicates
+            the number of a dynamically loaded compression filter. (See
             h5py.groups.create_dataset())
 
         dataset_dtypes (dict): A dictionary from :class:`VolumeType` to datatype
@@ -100,7 +100,7 @@ class Snapshot(BatchFilter):
                         dataset = f.create_dataset(name=ds_name, data=volume.data.astype(dtype), compression=self.compression_type)
                     else:
                         dataset = f.create_dataset(name=ds_name, data=volume.data, compression=self.compression_type)
-                    
+
                     dataset.attrs['offset'] = offset
                     dataset.attrs['resolution'] = self.spec[volume_type].voxel_size
 
@@ -110,6 +110,9 @@ class Snapshot(BatchFilter):
 
                 if batch.loss is not None:
                     f['/'].attrs['loss'] = batch.loss
+
+                if batch.iteration is not None:
+                    f['/'].attrs['iter'] = batch.iteration
 
         self.n += 1
 
