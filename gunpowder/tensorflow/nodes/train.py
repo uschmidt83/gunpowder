@@ -219,6 +219,8 @@ class Train(GenericTrain):
 
         # find most recent checkpoint
         checkpoint = tf.train.latest_checkpoint(self.checkpoint_dir)
+        logger.debug("Checkpoint Dir Contents %s", os.listdir(self.checkpoint_dir))
+
 
         if checkpoint:
 
@@ -239,7 +241,7 @@ class Train(GenericTrain):
                 self.__restore_graph(checkpoint, restore_full=False)
         else:
 
-            logger.info("No checkpoint found")
+            logger.info("No checkpoint found in %s", self.checkpoint_dir)
 
             # initialize all variables
             self.session.run(tf.global_variables_initializer())
