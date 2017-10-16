@@ -117,12 +117,14 @@ class AddLongRangeAffinities(BatchFilter):
                 (len(self.affinity_vectors),) +
                 tuple(request_vol.roi.get_shape()/request_vol.voxel_size), dtype=full_vol1.spec.dtype)
 
-            # calculate affinities
+            # calculate affinities vol 1
             vol1 = full_vol1.crop(request_vol.roi)
             for i, vector in enumerate(self.affinity_vectors):
                 vol2 = full_vol2.crop(request_vol.roi.shift(tuple(-vector)))
                 affinity_map[i,:,:,:] = np.bitwise_and(vol1.data, vol2.data)
 
+            if not self.output_with_IDs:
+                affinity_map[np.where(affinity_map != 0)] = 1
 
             batch.volumes[self.affinity_volume_type_1] = Volume(affinity_map,
                 spec=request[self.affinity_volume_type_1].copy())
@@ -138,7 +140,7 @@ class AddLongRangeAffinities(BatchFilter):
                 (len(self.affinity_vectors),) +
                 tuple(request_vol.roi.get_shape()/request_vol.voxel_size), dtype=full_vol1.spec.dtype)
 
-            # calculate affinities
+            # calculate affinities vol 2
             vol2 = full_vol2.crop(request_vol.roi)
             for i, vector in enumerate(self.affinity_vectors):
                 vol1 = full_vol1.crop(request_vol.roi.shift(tuple(vector)))
