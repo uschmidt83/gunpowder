@@ -8,6 +8,7 @@ from .elastic_augment_points import TestElasticAugment
 from .hdf5_write import TestHdf5Write
 from .merge_provider import TestMergeProvider
 from .normalize import TestNormalize
+from .parallel_tf import TestTensorflowParallel
 from .points_types import TestPointsTypes
 from .precache import TestPreCache
 from .prepare_malis import TestPrepareMalis
