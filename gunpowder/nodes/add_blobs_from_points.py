@@ -2,7 +2,7 @@ import logging
 import itertools
 import numpy as np
 
-from gunpowder.volume import Volume
+from gunpowder.volume import Volume, VolumeTypes
 from .batch_filter import BatchFilter
 
 logger = logging.getLogger(__name__)
@@ -194,8 +194,8 @@ class AddBlobsFromPoints(BatchFilter):
         for volume_type, volume in request.volume_specs.items():
             batch.volumes[volume_type] = batch.volumes[volume_type].crop(volume.roi)
 
-        for points_type, points in request.points_specs.items():
-            batch.points[points_type] = batch.points[points_type].spec.roi = points.roi
+        # for points_type, points in request.points_specs.items():
+        #     batch.points[points_type] = batch.points[points_type].spec.roi = points.roi
 
 class BlobPlacer:
     ''' Places synapse volume blobs from location data.
