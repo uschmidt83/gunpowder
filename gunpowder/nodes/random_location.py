@@ -8,9 +8,12 @@ from gunpowder.batch_request import BatchRequest
 from gunpowder.coordinate import Coordinate
 from gunpowder.roi import Roi
 from gunpowder.volume import VolumeTypes
+from gunpowder.points_spec import PointsSpec
 from .batch_filter import BatchFilter
 
 logger = logging.getLogger(__name__)
+
+import pdb
 
 class RandomLocation(BatchFilter):
     '''Choses a batch at a random location in the bounding box of the upstream
@@ -83,7 +86,7 @@ class RandomLocation(BatchFilter):
             self.mask_integral = np.array(mask_data>0, dtype=mask_integral_dtype)
             self.mask_integral = integral_image(self.mask_integral)
 
-        # clear bounding boxes of all provided volumes and points -- 
+        # clear bounding boxes of all provided volumes and points --
         # RandomLocation does not have limits (offsets are ignored)
         for identifier, spec in self.spec.items():
             spec.roi = None
@@ -105,8 +108,8 @@ class RandomLocation(BatchFilter):
         else:
             lcm_voxel_size = None
 
-
         for identifier, spec in request.items():
+
             request_roi = spec.roi
             if identifier in self.upstream_spec:
                 provided_roi = self.upstream_spec[identifier].roi
@@ -121,16 +124,18 @@ class RandomLocation(BatchFilter):
             else:
                 shift_roi = shift_roi.intersect(type_shift_roi)
 
+
         logger.debug("valid shifts for request in " + str(shift_roi))
 
         assert shift_roi is not None and shift_roi.size() > 0, (
-                "Can not satisfy batch request, no location covers all "
-                "requested ROIs.")
+                "Shift Roi (%s) cannot satisfy batch request, no location covers all "
+                "requested ROIs."%(shift_roi))
 
         if lcm_voxel_size is not None:
             lcm_shift_roi = shift_roi/lcm_voxel_size
         else:
             lcm_shift_roi = shift_roi
+
 
         good_location_found_for_mask, good_location_found_for_points = False, False
         while not good_location_found_for_mask or not good_location_found_for_points:
@@ -146,17 +151,22 @@ class RandomLocation(BatchFilter):
             good_location_found_for_mask, good_location_found_for_points = False, False
             if self.focus_points_type is not None:
 
-                focused_points_roi = request.points_spec[self.focus_points_type].roi
+
+                focused_points_roi = request[self.focus_points_type].roi
                 focused_points_offset = focused_points_roi.get_offset()
                 focused_points_shape  = focused_points_roi.get_shape()
 
                 # prefetch points in roi of focus_points_type
                 request_for_focused_pointstype = BatchRequest()
-                request_for_focused_pointstype.points_spec[self.focus_points_type] = PointsSpec(roi=focused_points_roi.shift(random_shift))
-                batch_of_points    = self.get_upstream_provider().request_batch(request_for_focused_pointstype)
+                request_for_focused_pointstype[self.focus_points_type] = PointsSpec(roi=focused_points_roi.shift(random_shift))
+
+
+                batch_of_points = self.get_upstream_provider().request_batch(request_for_focused_pointstype)
                 point_ids_in_batch = batch_of_points.points[self.focus_points_type].data.keys()
 
                 if len(point_ids_in_batch) > 0:
+
+
                     chosen_point_id       = np.random.choice(point_ids_in_batch, size=1)[0]
                     chosen_point_location = Coordinate(batch_of_points.points[self.focus_points_type].data[chosen_point_id].location)
                     distance_focused_roi_to_chosen_point = chosen_point_location - (initial_random_shift + focused_points_offset)
@@ -240,4 +250,4 @@ class RandomLocation(BatchFilter):
 
     def lcm(self, a, b):
 
-        return 
+        return
