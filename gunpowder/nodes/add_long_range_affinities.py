@@ -159,9 +159,9 @@ class AddLongRangeAffinities(BatchFilter):
         for volume_type, volume in request.volume_specs.items():
             batch.volumes[volume_type] = batch.volumes[volume_type].crop(volume.roi)
 
-        for points_type, points in request.points_specs.items():
-            recropped = batch.points[points_type].spec.roi = points.roi
-            batch.points[points_type] = recropped
+        # for points_type, points in request.points_specs.items():
+        #     recropped = batch.points[points_type].spec.roi = points.roi
+        #     batch.points[points_type] = recropped
 
 
 def round_up_to_voxel_size(shape, voxel_size):

@@ -1,6 +1,7 @@
 import logging
 import os
 import numpy as np
+import pdb
 
 from gunpowder.ext import tensorflow as tf
 from gunpowder.nodes.generic_train import GenericTrain
@@ -83,7 +84,8 @@ class Train(GenericTrain):
             gradients,
             volume_specs=None,
             save_every=2000,
-            checkpoint_dir=''):
+            checkpoint_dir='',
+            checkpoint_file=None):
 
         super(Train, self).__init__(
             inputs,
@@ -105,6 +107,7 @@ class Train(GenericTrain):
         self.iteration = None
         self.iteration_increment = None
         self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_file = checkpoint_file
 
         if isinstance(optimizer, basestring):
             self.optimizer_loss_names = (optimizer, loss)
@@ -217,10 +220,14 @@ class Train(GenericTrain):
         # We create a 'full_saver' including those variables.
         self.full_saver = tf.train.Saver(max_to_keep=None)
 
-        # find most recent checkpoint
-        checkpoint = tf.train.latest_checkpoint(self.checkpoint_dir)
-        logger.debug("Checkpoint Dir Contents %s", os.listdir(self.checkpoint_dir))
+        if self.checkpoint_file is None:
+            # find most recent checkpoint
+            checkpoint = tf.train.latest_checkpoint(self.checkpoint_dir)
+        else:
+            # load specified checkpoint
+            checkpoint = os.path.join(self.checkpoint_dir, self.checkpoint_file).decode('utf-8')
 
+        logger.debug("Checkpoint Dir Contents %s", os.listdir(self.checkpoint_dir))
 
         if checkpoint:
 
