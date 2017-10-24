@@ -33,4 +33,5 @@ from .simple_augment import SimpleAugment
 from .snapshot import Snapshot
 from .specified_location import SpecifiedLocation
 from .split_and_renumber_segmentation_labels import SplitAndRenumberSegmentationLabels
+from .square_error_metric import SquaredErrorMetric
 from .zero_out_const_sections import ZeroOutConstSections
