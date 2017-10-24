@@ -102,8 +102,8 @@ class SpecifiedLocation(BatchFilter):
                         roi = spec.roi.shift(self.specified_shift)
                         if not self.upstream_spec[data_type].roi.contains(roi):
                             request_fits = False
-                            logger.warning("selected roi {} doesn't fit in upstream provider.\n \
-    Skipping this location...".format(roi))
+                            logger.warning("selected roi {} doesn't fit in upstream provider {}.\n \
+    Skipping this location...".format(roi, self.upstream_spec[data_type].roi))
                             break;
                     if not request_fits:
                         break;
