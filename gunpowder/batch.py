@@ -23,6 +23,7 @@ class Batch(Freezable):
 
         self.id = Batch.get_next_id()
         self.profiling_stats = ProfilingStats()
+        self.info = {'ID': self.id}
         self.volumes = {}
         self.points  = {}
         self.affinity_neighborhood = None
