@@ -6,6 +6,7 @@ from gunpowder.batch_request import BatchRequest
 from gunpowder.ext import h5py
 from gunpowder.volume import VolumeTypes
 
+import pdb
 logger = logging.getLogger(__name__)
 
 class Snapshot(BatchFilter):
@@ -113,6 +114,9 @@ class Snapshot(BatchFilter):
 
                 if batch.iteration is not None:
                     f['/'].attrs['iter'] = batch.iteration
+
+                for name, info in batch.info.items():
+                    f['/'].attrs['info/'+name] = info
 
         self.n += 1
 
