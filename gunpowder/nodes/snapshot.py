@@ -6,7 +6,6 @@ from gunpowder.batch_request import BatchRequest
 from gunpowder.ext import h5py
 from gunpowder.volume import VolumeTypes
 
-import pdb
 logger = logging.getLogger(__name__)
 
 class Snapshot(BatchFilter):
