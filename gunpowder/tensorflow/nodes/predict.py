@@ -100,8 +100,11 @@ class Predict(GenericPredict):
         # restore variables
         if self.checkpoint_path:
             saver.restore(self.session, self.checkpoint_path)
+            logger.critical("Restored Graph from %s" %(self.checkpoint_path))
         else:
             saver.restore(self.session, self.meta_graph_basename)
+            logger.critical("Restored Graph from %s" %(self.meta_graph_basenames))
+
 
     def __collect_requested_outputs(self, request):
 
