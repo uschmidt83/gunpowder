@@ -1,5 +1,6 @@
 import copy
 import random
+import numpy as np
 
 from .batch_provider import BatchProvider
 
@@ -29,5 +30,5 @@ class RandomProvider(BatchProvider):
     def provide(self, request):
         chosen_provider = random.choice(self.get_upstream_providers())
         batch = chosen_provider.request_batch(request)
-        batch.info['source'] = chosen_provider.inputs
+        batch.info['source'] = np.string_(chosen_provider.inputs)
         return batch
