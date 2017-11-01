@@ -139,16 +139,24 @@ class BalanceLabels(BatchFilter):
         masked_in = scale.sum()
         num_pos  = (labels*scale).sum()
         frac_pos = float(num_pos) / masked_in if masked_in > 0 else 0
-        frac_pos = np.clip(frac_pos, 0.05, 0.95)
         frac_neg = 1.0 - frac_pos
-
-        # compute the class weights for positive and negative samples
-        w_pos = 1.0 / (2.0 * frac_pos)
-        w_neg = 1.0 / (2.0 * frac_neg)
 
         if frac_pos <= min_frac or frac_neg <= min_frac:
             # If not enough pos or neg examples, ignore slab
             scale *= 0
+
         else:
+            frac_pos = np.clip(frac_pos, 0.05, 0.95)
+            frac_neg = 1.0 - frac_pos
+
+            # compute the class weights for positive and negative samples
+            w_pos = 1.0 / (2.0 * frac_pos)
+            w_neg = 1.0 / (2.0 * frac_neg)
+
             # scale the masked-in scale with the class weights
             scale *= (labels >= 0.5) * w_pos + (labels < 0.5) * w_neg
+
+
+
+
+
