@@ -22,6 +22,7 @@ from .merge_provider import MergeProvider
 from .normalize import Normalize
 from .pad import Pad
 from .precache import PreCache
+from .predict_synaptic_pairs import PredictSynapticPairs
 from .prepare_malis import PrepareMalis
 from .print_profiling_stats import PrintProfilingStats
 from .random_location import RandomLocation
