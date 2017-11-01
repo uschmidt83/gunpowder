@@ -115,7 +115,10 @@ class Snapshot(BatchFilter):
                     f['/'].attrs['iter'] = batch.iteration
 
                 for name, info in batch.info.items():
-                    f['/'].attrs['info/'+name] = info
+                    try:
+                        f['/'].attrs['info/'+name] = info
+                    except:
+                        logger.warning('From info entry %s: dtype %s cannot be written to hdf5 file' % (name, type(info)))
 
         self.n += 1
 
