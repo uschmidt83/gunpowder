@@ -8,14 +8,14 @@ logger = logging.getLogger(__name__)
 class PrintProfilingStats(BatchFilter):
     '''Print profiling information about nodes upstream of this node in the DAG.
 
-    The output also includes a ``TOTAL`` section, which shows the wall-time 
-    spent in the upstream and downstream passes. For the downstream pass, this 
-    information is not available in the first iteration, since the request-batch 
+    The output also includes a ``TOTAL`` section, which shows the wall-time
+    spent in the upstream and downstream passes. For the downstream pass, this
+    information is not available in the first iteration, since the request-batch
     cycle is not completed, yet.
 
     Args:
 
-        every (int): Collect statistics about that many batch requests and show 
+        every (int): Collect statistics about that many batch requests and show
             min, max, mean, and median runtimes.
     '''
 
@@ -32,7 +32,7 @@ class PrintProfilingStats(BatchFilter):
     def prepare(self, request):
 
         self.__downstream_timing.stop()
-        # skip the first one, where we don't know how much time we spent 
+        # skip the first one, where we don't know how much time we spent
         # downstream
         if self.__downstream_timing.elapsed() > 0:
             self.__downstream_timing_summary.add(self.__downstream_timing)
@@ -100,7 +100,7 @@ class PrintProfilingStats(BatchFilter):
 
         stats += "\n"
 
-        logger.info(stats)
+        logger.critical(stats)
 
         # reset summaries
         self.accumulated_stats = ProfilingStats()

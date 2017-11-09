@@ -5,10 +5,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Crop(BatchFilter):
-    '''Limits provided ROI to user defined ROIs per Volume-/PointsTypes 
-        
+    '''Limits provided ROI to user defined ROIs per Volume-/PointsTypes
+
     Args:
-        
+
         volumes (dict):     Dictionary from :class:``VolumeType`` to its new :class:``ROI``.
         points (dict):      Dictionary from :class:``PointsType`` to its new :class:``ROI``.
     '''
@@ -26,6 +26,9 @@ class Crop(BatchFilter):
             self.points  = points
 
     def setup(self):
+        # import pdb
+        # pdb.set_trace()
+
 
         for crop_specs, specs in zip([self.volumes, self.points],[self.spec.volume_specs, self.spec.points_specs]):
             for type, roi in crop_specs.items():

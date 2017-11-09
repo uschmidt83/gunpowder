@@ -14,7 +14,7 @@ class BatchRequest(ProviderSpec):
     For usage, see the documentation of :class:`ProviderSpec`.
     '''
 
-    def add(self, identifier, roi):
+    def add(self, identifier, roi, voxel_size=None):
         '''Convenience method to add a volume or point spec by providing only
         the shape of a ROI (in world units).
 
@@ -37,6 +37,10 @@ class BatchRequest(ProviderSpec):
             raise RuntimeError("Only VolumeType or PointsType can be added.")
 
         spec.roi = roi
+
+        if voxel_size is not None:
+            spec.voxel_size = voxel_size
+
         self[identifier] = spec
 
 

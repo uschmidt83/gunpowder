@@ -6,6 +6,7 @@ import pdb
 from gunpowder.volume import Volume, VolumeTypes
 from gunpowder.points_spec import PointsSpec
 from gunpowder.points import *
+from scipy.ndimage.interpolation import shift
 
 
 from .batch_filter import BatchFilter
@@ -17,10 +18,11 @@ logger = logging.getLogger(__name__)
 
 class PredictSynapticPairs(BatchFilter):
 
-    def __init__(self, affinity_pred_volume, segmentation_volume, pred_presyn_points_name,
+    def __init__(self, affinity_pre_pred_volume, affinity_post_pred_volume, segmentation_volume, pred_presyn_points_name,
      pred_postsyn_points_name, affinity_vectors, threshold = 500):
 
-        self.affinity_pred_volume = affinity_pred_volume
+        self.affinity_pre_pred_volume = affinity_pre_pred_volume
+        self.affinity_post_pred_volume = affinity_post_pred_volume
         self.segmentation_volume = segmentation_volume
         self.pred_presyn_points_name = pred_presyn_points_name
         self.pred_postsyn_points_name = pred_postsyn_points_name
@@ -33,8 +35,13 @@ class PredictSynapticPairs(BatchFilter):
 
         logger.debug("predict setup start" )
 
-        assert self.affinity_pred_volume in self.spec, "Upstream does not provide %s needed by \
-        AddGtAffinities"%self.affinity_pred_volume
+
+        assert self.affinity_pre_pred_volume  in self.spec, "Upstream does not provide %s needed by \
+        AddGtAffinities"%self.affinity_pre_pred_volume
+
+        assert self.affinity_post_pred_volume  in self.spec, "Upstream does not provide %s needed by \
+        AddGtAffinities"%self.affinity_post_pred_volume
+
         assert self.segmentation_volume in self.spec, "Upstream does not provide %s needed by \
         AddGtAffinities"%self.segmentation_volume
 
@@ -65,31 +72,38 @@ class PredictSynapticPairs(BatchFilter):
         #     return
         logger.debug("predict prepare start" )
 
-
-        points_request_roi = (request[self.pred_presyn_points_name].roi).union(
+        output_points_request_roi = (request[self.pred_presyn_points_name].roi).union(
             request[self.pred_postsyn_points_name].roi)
 
-        logger.debug("downstream points request: " + str(points_request_roi))
+        logger.debug("downstream points request: " + str(output_points_request_roi))
 
-        # add required volumes with correct roi
-        if self.affinity_pred_volume in request:
-            request[self.affinity_pred_volume].roi = request[self.affinity_pred_volume].roi.union(
-                points_request_roi)
-        else:
-            request.add(self.affinity_pred_volume, points_request_roi)
+         # Requested extended label roi
+        input_request_roi_needed = output_points_request_roi.grow(self.padding, self.padding)
 
-        # Requested extended label roi
-        points_request_roi = points_request_roi.grow(self.padding, self.padding)
+        logger.debug("upstream valoumes needed: " + str(input_request_roi_needed))
 
         # pdb.set_trace()
+
+
+        # add required volumes with correct roi
+        if self.affinity_pre_pred_volume in request:
+            request[self.affinity_pre_pred_volume].roi = request[self.affinity_pre_pred_volume].roi.union(
+                output_points_request_roi)
+        else:
+            request.add(self.affinity_pre_pred_volume, output_points_request_roi)
+
+        # add required volumes with correct roi
+        if self.affinity_post_pred_volume in request:
+            request[self.affinity_post_pred_volume].roi = request[self.affinity_post_pred_volume].roi.union(
+                output_points_request_roi)
+        else:
+            request.add(self.affinity_post_pred_volume, output_points_request_roi)
 
         if self.segmentation_volume in request:
             request[self.segmentation_volume].roi = request[self.segmentation_volume].roi.union(
-                points_request_roi)
+                input_request_roi_needed)
         else:
-            request.add(self.segmentation_volume, points_request_roi)
-
-        # pdb.set_trace()
+            request.add(self.segmentation_volume, input_request_roi_needed)
 
         del request[self.pred_presyn_points_name]
         del request[self.pred_postsyn_points_name]
@@ -102,31 +116,50 @@ class PredictSynapticPairs(BatchFilter):
         #         self.skip_next = False
         #         return
 
-        pred_vol = batch.volumes[self.affinity_pred_volume].data
+        # get intersection
+
+        pred_pre_vol = batch.volumes[self.affinity_pre_pred_volume].data
+        pred_post_vol = batch.volumes[self.affinity_post_pred_volume].data
+        output_points_request_roi = request[self.pred_presyn_points_name].roi
+
+        assert pred_pre_vol.shape == pred_post_vol.shape, \
+        "Pre and Post predicted affinity maps must have the same shape."
+
         seg_vol = batch.volumes[self.segmentation_volume].data
         voxel_size = self.spec[self.segmentation_volume].voxel_size
 
-        str_3D=np.array( [[[0, 0, 0],
-                        [0, 1, 0],
-                        [0, 0, 0]],
+        str_3D=np.array( [[ [0, 0, 0],
+                            [0, 1, 0],
+                            [0, 0, 0]],
 
-                       [[0, 1, 0],
-                        [1, 1, 1],
-                        [0, 1, 0]],
+                           [[0, 1, 0],
+                            [1, 1, 1],
+                            [0, 1, 0]],
 
-                       [[0, 0, 0],
-                        [0, 1, 0],
-                        [0, 0, 0]]], dtype='uint8')
+                           [[0, 0, 0],
+                            [0, 1, 0],
+                            [0, 0, 0]]], dtype='uint8')
 
 
         # for each affinity map
         potential_pairs = {}
 
         # For each affinity vector
-        for aff_vec_i in range(pred_vol.shape[0]):
+        for aff_vec_i in range(pred_pre_vol.shape[0]):
             aff_vec = self.affinity_vectors[aff_vec_i]/voxel_size
-            aff_vec_vol_prob = pred_vol[aff_vec_i,:,:,:]
-            aff_vec_vol = (aff_vec_vol_prob > 0.5)*1.0
+
+            aff_vec_pre_prob = pred_pre_vol[aff_vec_i,:,:,:]
+            aff_vec_post_prob = pred_post_vol[aff_vec_i,:,:,:]
+
+            # Calculate intersection
+
+            ## TODO SHIFTING
+            # pdb.set_trace()
+            # might be +aff_vec
+            shifted_aff_vec_post_prob = shift(aff_vec_post_prob, -aff_vec)
+            aff_vec_vol_prob = aff_vec_pre_prob*shifted_aff_vec_post_prob
+
+            aff_vec_vol = (aff_vec_vol_prob > 0.25)*1.0
 
             logger.debug('Vector Hits: {}'.format(np.sum(aff_vec_vol)))
 
@@ -229,8 +262,8 @@ class PredictSynapticPairs(BatchFilter):
 
             # Check the average location is in the same neuron as the individual locations
             if pre_neuron_id != locations['pre']['neuron_id']:
-                logger.warning('Pre average locations lies in different neuron than individuals\
-                 individual neuron_ids:{} average neuron_ids:{}'.format(
+                logger.warning('Pre average locations lies in different neuron than \
+individual neuron_ids:{} average neuron_ids:{}'.format(
                     locations['pre']['neuron_id'], pre_neuron_id))
                 pdb.set_trace()
 
@@ -240,8 +273,8 @@ class PredictSynapticPairs(BatchFilter):
 
             # Check the average location is in the same neuron as the individual locations
             if post_neuron_id != locations['post']['neuron_id']:
-                logger.warning('Post average locations lies in different neuron than individuals\
-                 individual neuron_ids:{} average neuron_ids:{}'.format(
+                logger.warning('Post average locations lies in different neuron than \
+individual neuron_ids:{} average neuron_ids:{}'.format(
                     locations['pre']['neuron_id'], post_neuron_id))
                 pdb.set_trace()
 

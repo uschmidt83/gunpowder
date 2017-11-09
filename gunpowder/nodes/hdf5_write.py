@@ -9,25 +9,25 @@ from gunpowder.volume import VolumeTypes
 logger = logging.getLogger(__name__)
 
 class Hdf5Write(BatchFilter):
-    '''Assemble volumes of passing batches in one HDF5 file. This is useful to 
-    store chunks produced by :class:`Scan` on disk without keeping the larger 
-    volume in memory. The ROIs of the passing volumes will be used to determine 
+    '''Assemble volumes of passing batches in one HDF5 file. This is useful to
+    store chunks produced by :class:`Scan` on disk without keeping the larger
+    volume in memory. The ROIs of the passing volumes will be used to determine
     the position where to store the data in the dataset.
 
     Args:
 
-        dataset_names (dict): A dictionary from :class:`VolumeType` to names of 
+        dataset_names (dict): A dictionary from :class:`VolumeType` to names of
             the datasets to store them in.
 
-        output_dir (string): The directory to save the HDF5 file. Will be 
+        output_dir (string): The directory to save the HDF5 file. Will be
             created, if it does not exist.
 
         output_filename (string): The output filename.
 
-        compression_type (string or int): Compression strategy.  Legal values 
-            are 'gzip', 'szip', 'lzf'.  If an integer in range(10), this 
-            indicates gzip compression level. Otherwise, an integer indicates 
-            the number of a dynamically loaded compression filter. (See 
+        compression_type (string or int): Compression strategy.  Legal values
+            are 'gzip', 'szip', 'lzf'.  If an integer in range(10), this
+            indicates gzip compression level. Otherwise, an integer indicates
+            the number of a dynamically loaded compression filter. (See
             h5py.groups.create_dataset())
 
         dataset_dtypes (dict): A dictionary from :class:`VolumeType` to datatype
@@ -101,12 +101,14 @@ class Hdf5Write(BatchFilter):
             self.datasets[volume_type] = dataset
 
     def process(self, batch, request):
-
+        import pdb
         if self.file is None:
             logger.info("Creating HDF file...")
             self.create_output_file(batch)
 
         for volume_type, dataset in self.datasets.items():
+
+            # pdb.set_trace()
 
             roi = batch.volumes[volume_type].spec.roi
             data = batch.volumes[volume_type].data

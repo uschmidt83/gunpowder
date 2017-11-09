@@ -127,7 +127,8 @@ class Roi(Freezable):
         if not self.intersects(other):
             return Roi() # empty ROI
 
-        assert self.dims() == other.dims()
+        assert self.dims() == other.dims(), \
+        "Can't intersect volumes with different dimensions (%s vs. %s)"%(self.dims(), other.dims())
 
         offset = Coordinate(
                 max(self.__offset[d], other.__offset[d])

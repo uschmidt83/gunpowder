@@ -76,9 +76,8 @@ class Predict(GenericPredict):
         for volume_type in volume_outputs:
             spec = self.spec[volume_type].copy()
             spec.roi = request[volume_type].roi
-            batch.volumes[volume_type] = Volume(
-                outputs[volume_type],
-                spec)
+
+            batch.volumes[volume_type] = Volume(outputs[volume_type], spec)
 
         logger.debug("predicted in batch %i", batch.id)
 

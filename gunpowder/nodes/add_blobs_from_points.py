@@ -4,8 +4,11 @@ import numpy as np
 
 from gunpowder.volume import Volume, VolumeTypes
 from .batch_filter import BatchFilter
+from gunpowder.points import *
+
 
 logger = logging.getLogger(__name__)
+import pdb
 
 class AddBlobsFromPoints(BatchFilter):
     '''Add a volume with blobs at locations given by a specified point type.
@@ -113,6 +116,8 @@ class AddBlobsFromPoints(BatchFilter):
         all_points = {}
         all_synapse_ids = {}
 
+        # pdb.set_trace()
+
         for blob_name, settings in self.blob_settings.items():
             # Unpack settings
             point_type = settings['point_type']
@@ -127,6 +132,9 @@ class AddBlobsFromPoints(BatchFilter):
 
             # Get point data
             points = batch.points[point_type]
+
+            # if settings['output_volume_type'] == VolumeTypes.PRESYN_PRED_BLOB:
+            #     pdb.set_trace()
 
             # If point doesn't have it's corresponding partner, delete it
             if 'partner_points' in settings.keys() and settings['partner_points'] is not None:
@@ -161,6 +169,11 @@ class AddBlobsFromPoints(BatchFilter):
             # Initialize output volume
             shape_volume = np.asarray(request[volume_type].roi.get_shape())/voxel_size
             blob_map = np.zeros(shape_volume, dtype=dtype)
+
+            # if settings['output_volume_type'] == VolumeTypes.PRESYN_PRED_BLOB and np.sum(blob_map) > 0:
+            #     logger.warning('Found map!')
+
+            #     pdb.set_trace()
 
             # Get point data
             points = batch.points[point_type]
@@ -256,5 +269,9 @@ class BlobPlacer:
             matrix[start[0]:end[0], start[1]:end[1], start[2]:end[2]] += shape*marker
             return matrix, True
 
-        logger.warning('Location %s out of bounds'%(location))
-        return matrix, False
+        else:
+            logger.warning('Location %s out of bounds'%(location))
+
+            # if marker < 10:
+            #     pdb.set_trace()
+            return matrix, False
