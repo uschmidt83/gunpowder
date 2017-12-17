@@ -9,16 +9,48 @@ from .batch_filter import BatchFilter
 logger = logging.getLogger(__name__)
 
 class AddLongRangeAffinities(BatchFilter):
+     '''Add affinities volumes to the batch defined by a neighborhood and two volumes.
+
+    Affinity values are defined as the bitwise-and operation applied on each voxel and
+    entry in the neighborhood list, i.e., for each voxel and each neighbor of this voxel.
+
+    Two affinity maps are produced, one taking taking the ``presyn_volumes`` as the
+    references and the ``affinity_neighborhood`` as the neighbor locations and another
+    taking the ``postsyn_volume`` as the reference and -affinity_neighborhood as the neighbor
+    locations.
+
+    Args:
+
+        affinity_neighborhood(list of offsets): List of offsets for the
+            affinities to consider for each voxel.
+
+        presyn_volume(:class:``VolumeType``, optional): The pre synaptic volume type.
+            Defaults to ``PRESYN_BLOBS``.
+
+        postsyn_volume(:class:``VolumeType``, optional): The post synaptic volume type.
+            Defaults to ``POSTSYN_BLOBS``.
+
+        affinity_presyn_volume(:class:``VolumeType``, optional): The generated affinitiy
+            map from the pre to the post synaptic volume. Defaults to ``PRE_LR_AFFINITIES``.
+
+        affinity_postsyn_volume(:class:``VolumeType``, optional): The generated affinitiy
+            map from the post to the pre synaptic volume. Defaults to ``POST_LR_AFFINITIES``.
+
+        output_with_IDs(:class:``boolean``, optional): A parameter to choose whether to output
+            the value of the input reference volume masked with the bitwise-and of the shifted
+            volumes (True) or output the bitwise-and result iself (False). Defaults to False.
+
+    '''
 
 
-    def __init__(self, affinity_vectors, volume_type_1=None, volume_type_2=None,
-        affinity_volume_type_1=None, affinity_volume_type_2=None, output_with_IDs = False):
+    def __init__(self, affinity_neighborhood, presyn_volume=None, postsyn_volume=None,
+        affinity_presyn_volume=None, affinity_postsyn_volume=None, output_with_IDs = False):
 
-        self.volume_type_1 = volume_type_1
-        self.volume_type_2 = volume_type_2
-        self.affinity_volume_type_1 = affinity_volume_type_1
-        self.affinity_volume_type_2 = affinity_volume_type_2
-        self.affinity_vectors = affinity_vectors
+        self.presyn_volume = presyn_volume
+        self.postsyn_volume = postsyn_volume
+        self.affinity_presyn_volume = affinity_presyn_volume
+        self.affinity_postsyn_volume = affinity_postsyn_volume
+        self.affinity_neighborhood = affinity_neighborhood
         self.output_with_IDs = output_with_IDs
 
         if presyn_volume is None:
