@@ -37,6 +37,7 @@ class Predict(GenericPredict):
             meta_graph_basename,
             inputs,
             outputs,
+            checkpoint_path=None,
             volume_specs=None):
 
         super(Predict, self).__init__(
@@ -47,6 +48,7 @@ class Predict(GenericPredict):
         self.meta_graph_basename = meta_graph_basename
         self.session = None
         self.graph = None
+        self.checkpoint_path = checkpoint_path
 
     def start(self):
 
@@ -74,9 +76,8 @@ class Predict(GenericPredict):
         for volume_type in volume_outputs:
             spec = self.spec[volume_type].copy()
             spec.roi = request[volume_type].roi
-            batch.volumes[volume_type] = Volume(
-                outputs[volume_type],
-                spec)
+
+            batch.volumes[volume_type] = Volume(outputs[volume_type], spec)
 
         logger.debug("predicted in batch %i", batch.id)
 
@@ -96,7 +97,13 @@ class Predict(GenericPredict):
             self.meta_graph_basename + '.meta',
             clear_devices=True)
         # restore variables
-        saver.restore(self.session, self.meta_graph_basename)
+        if self.checkpoint_path:
+            saver.restore(self.session, self.checkpoint_path)
+            logger.critical("Restored Graph from %s" %(self.checkpoint_path))
+        else:
+            saver.restore(self.session, self.meta_graph_basename)
+            logger.critical("Restored Graph from %s" %(self.meta_graph_basenames))
+
 
     def __collect_requested_outputs(self, request):
 
