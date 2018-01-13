@@ -35,7 +35,7 @@ class Reject(BatchFilter):
 
             if not have_good_batch:
 
-                logger.debug(
+                logger.warning(
                     "reject batch with mask ratio %f at "%mask_ratio +
                     str(batch.volumes[self.mask_volume_type].spec.roi))
                 num_rejected += 1
