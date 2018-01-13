@@ -32,11 +32,12 @@ class Scan(BatchFilter):
             batches to hold at most.
     '''
 
-    def __init__(self, reference, num_workers=1, cache_size=50):
+    def __init__(self, reference, num_workers=1, cache_size=50, aggregate=True):
 
         self.reference = reference.copy()
         self.num_workers = num_workers
         self.cache_size = cache_size
+        self.aggregate = aggregate
         self.workers = None
         if num_workers > 1:
             self.request_queue = multiprocessing.Queue(maxsize=0)
@@ -59,6 +60,7 @@ class Scan(BatchFilter):
 
         empty_request = (len(request) == 0)
         if empty_request:
+            logger.warn('Scan got an empty request, will scan whole upstream provider')
             scan_spec = self.spec
         else:
             scan_spec = request
@@ -84,7 +86,7 @@ class Scan(BatchFilter):
 
                 chunk = self.workers.get()
 
-                if not empty_request:
+                if not empty_request and self.aggregate:
                     self.__add_to_batch(request, chunk)
 
                 logger.info("processed chunk %d/%d", i, num_chunks)
@@ -96,7 +98,7 @@ class Scan(BatchFilter):
                 shifted_reference = self.__shift_request(self.reference, shift)
                 chunk = self.__get_chunk(shifted_reference)
 
-                if not empty_request:
+                if not empty_request and self.aggregate:
                     self.__add_to_batch(request, chunk)
 
                 logger.info("processed chunk %d/%d", i, num_chunks)
@@ -169,8 +171,8 @@ class Scan(BatchFilter):
                 total_shift_roi = total_shift_roi.intersect(shift_roi)
                 if total_shift_roi.empty():
                     raise RuntimeError("There is no location where the ROIs "
-                                       "the reference %s are contained in the "
-                                       "request/upstream ROIs "
+                                       "the reference: %s \n are contained in the "
+                                       "request/upstream ROIs: "
                                        "%s."%(self.reference, spec))
 
         if total_shift_roi is None:
