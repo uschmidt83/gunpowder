@@ -2,8 +2,10 @@ import logging
 import itertools
 import numpy as np
 
-from gunpowder.volume import Volume
+from gunpowder.volume import Volume, VolumeTypes
 from .batch_filter import BatchFilter
+from gunpowder.points import *
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,7 @@ class AddBlobsFromPoints(BatchFilter):
                 )
 
     def setup(self):
+
         for blob_name, settings in self.blob_settings.items():
             self.provides(
                 settings['output_volume_type'],
@@ -69,35 +72,42 @@ class AddBlobsFromPoints(BatchFilter):
 
         for blob_name, settings in self.blob_settings.items():
             volume_type = settings['output_volume_type']
+
             if volume_type in request:
 
                 point_type = settings['point_type']
                 request_roi = request[volume_type].roi
 
+                # Get correct size for restrictive_mask_type
+                restrictive_mask_type = settings['restrictive_mask_type']
+
+                if restrictive_mask_type not in request.volume_specs:
+                    request.add(restrictive_mask_type, request_roi)
+                else:
+                    request[restrictive_mask_type].roi = \
+                     request[restrictive_mask_type].roi.union(request_roi)
+
+                    request[restrictive_mask_type].roi.snap_to_grid(\
+                     request[restrictive_mask_type].voxel_size, mode="GROW")
 
                 # If point is not already requested, add to request
                 if point_type not in request.points_specs:
-                    request.add(point_type, request_roi.get_shape())
+                    request.add(point_type, request_roi)
                 else:
-                    request[point_type].roi =\
+                    request.points_specs[point_type].roi =\
                      request[point_type].roi.union(request_roi)
 
-                # Get correct size for restrictive_mask_type
-                restrictive_mask_type = settings['restrictive_mask_type']
-                if restrictive_mask_type not in request.volume_specs:
-                    request.add(restrictive_mask_type, request_roi.get_shape())
-                else:
-                    request[restrictive_mask_type].roi =\
-                     request[restrictive_mask_type].roi.union(request_roi)
+                    request.points_specs[point_type].roi.snap_to_grid(\
+                     request[point_type].voxel_size, mode="GROW")
 
                 # this node will provide this volume type
                 del request[volume_type]
+
             else:
                 # do nothing if no blobs of this type were requested
                 logger.warning('%s output volume type for %s never requested. \
                     Deleting entry...'%(settings['output_volume_type'], blob_name))
                 del self.blob_settings[blob_name]
-
 
     def process(self, batch, request):
 
@@ -105,11 +115,11 @@ class AddBlobsFromPoints(BatchFilter):
         all_points = {}
         all_synapse_ids = {}
 
+
         for blob_name, settings in self.blob_settings.items():
             # Unpack settings
             point_type = settings['point_type']
             restrictive_mask_type = settings['restrictive_mask_type']
-
 
             # Make sure both the necesary point types and volumes are present
             assert point_type in batch.points, "Upstream does not provide required point type\
@@ -121,12 +131,13 @@ class AddBlobsFromPoints(BatchFilter):
             # Get point data
             points = batch.points[point_type]
 
+            # if settings['output_volume_type'] == VolumeTypes.PRESYN_PRED_BLOB:
+
             # If point doesn't have it's corresponding partner, delete it
             if 'partner_points' in settings.keys() and settings['partner_points'] is not None:
                 partner_points = batch.points[settings['partner_points']]
                 synapse_ids = []
                 for point_id, point in points.data.items():
-                    # pdb.set_trace()
                     if not point.partner_ids[0] in partner_points.data.keys():
                         logger.warning('Point %s has no partner. Deleting...'%point_id)
                         del points.data[point_id]
@@ -155,22 +166,24 @@ class AddBlobsFromPoints(BatchFilter):
             shape_volume = np.asarray(request[volume_type].roi.get_shape())/voxel_size
             blob_map = np.zeros(shape_volume, dtype=dtype)
 
+            # if settings['output_volume_type'] == VolumeTypes.PRESYN_PRED_BLOB and np.sum(blob_map) > 0:
+            #     logger.warning('Found map!')
+
             # Get point data
             points = batch.points[point_type]
 
-
             offset = np.asarray(points.spec.roi.get_offset())
             for point_id, point_data in points.data.items():
-                voxel_location = np.round(((point_data.location - offset)/(voxel_size))).astype('int32')
+                voxel_location = \
+                 np.round(((point_data.location - offset)/(voxel_size))).astype('int32')
 
                 synapse_id = point_data.synapse_id
-                # if mapping exists, do it
+                # if mapping exists, apply
                 if id_mapper is not None:
                     synapse_id = id_mapper(synapse_id)
 
                 settings['blob_placer'].place(blob_map, voxel_location,
                     synapse_id, restrictive_mask.data)
-
 
             # Provide volume
             batch.volumes[volume_type] = Volume(blob_map, spec=request[volume_type].copy())
@@ -184,12 +197,12 @@ class AddBlobsFromPoints(BatchFilter):
             batch.volumes[volume_type].attrs['point_ids'] = points.data.keys()
             batch.volumes[volume_type].attrs['synapse_ids'] = all_synapse_ids[point_type]
 
-            # Crop all other requests
+        # Crop all other requests
         for volume_type, volume in request.volume_specs.items():
             batch.volumes[volume_type] = batch.volumes[volume_type].crop(volume.roi)
 
-        for points_type, points in request.points_specs.items():
-            batch.points[points_type] = batch.points[points_type].spec.roi = points.roi
+        # for points_type, points in request.points_specs.items():
+        #     batch.points[points_type] = batch.points[points_type].spec.roi = points.roi
 
 class BlobPlacer:
     ''' Places synapse volume blobs from location data.
@@ -250,5 +263,7 @@ class BlobPlacer:
             matrix[start[0]:end[0], start[1]:end[1], start[2]:end[2]] += shape*marker
             return matrix, True
 
-        logger.warning('Location %s out of bounds'%(location))
-        return matrix, False
+        else:
+            logger.warning('Location %s out of bounds'%(location))
+
+            return matrix, False
