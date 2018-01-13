@@ -1,6 +1,7 @@
 import logging
 import os
 import numpy as np
+import pdb
 
 from gunpowder.ext import tensorflow as tf
 from gunpowder.nodes.generic_train import GenericTrain
@@ -82,7 +83,9 @@ class Train(GenericTrain):
             outputs,
             gradients,
             volume_specs=None,
-            save_every=2000):
+            save_every=2000,
+            checkpoint_dir='',
+            checkpoint_file=None):
 
         super(Train, self).__init__(
             inputs,
@@ -103,6 +106,8 @@ class Train(GenericTrain):
         self.save_every = save_every
         self.iteration = None
         self.iteration_increment = None
+        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_file = checkpoint_file
 
         if isinstance(optimizer, basestring):
             self.optimizer_loss_names = (optimizer, loss)
@@ -158,7 +163,7 @@ class Train(GenericTrain):
 
         if batch.iteration%self.save_every == 0:
 
-            checkpoint_name = (
+            checkpoint_name = os.path.join(self.checkpoint_dir,
                 self.meta_graph_filename +
                 '_checkpoint_%i'%batch.iteration)
 
@@ -186,8 +191,7 @@ class Train(GenericTrain):
         logger.info("Reading meta-graph...")
 
         # read the original meta-graph
-        tf.train.import_meta_graph(
-            self.meta_graph_filename + '.meta',
+        tf.train.import_meta_graph( self.meta_graph_filename + '.meta',
             clear_devices=True)
 
         # add custom gunpowder variables
@@ -216,9 +220,14 @@ class Train(GenericTrain):
         # We create a 'full_saver' including those variables.
         self.full_saver = tf.train.Saver(max_to_keep=None)
 
-        # find most recent checkpoint
-        checkpoint_dir = os.path.dirname(self.meta_graph_filename)
-        checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
+        if self.checkpoint_file is None:
+            # find most recent checkpoint
+            checkpoint = tf.train.latest_checkpoint(self.checkpoint_dir)
+        else:
+            # load specified checkpoint
+            checkpoint = os.path.join(self.checkpoint_dir, self.checkpoint_file).decode('utf-8')
+
+        logger.debug("Checkpoint Dir Contents %s", os.listdir(self.checkpoint_dir))
 
         if checkpoint:
 
@@ -239,7 +248,7 @@ class Train(GenericTrain):
                 self.__restore_graph(checkpoint, restore_full=False)
         else:
 
-            logger.info("No checkpoint found")
+            logger.info("No checkpoint found in %s", self.checkpoint_dir)
 
             # initialize all variables
             self.session.run(tf.global_variables_initializer())
