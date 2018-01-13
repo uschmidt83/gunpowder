@@ -32,10 +32,12 @@ class SpecifiedLocation(BatchFilter):
         be a data format compatible with hdf5.
     '''
 
-    def __init__(self, specified_coordinates, choose_randomly=False, extra_data=None):
+    def __init__(self, specified_coordinates, choose_randomly=False, extra_data=None, skip_out_of_bounds = False):
 
         self.coordinates = specified_coordinates
         self.choose_randomly = choose_randomly
+        self.skip_out_of_bounds = skip_out_of_bounds
+
         self.loc_i = 0
         self.upstream_spec = None
         self.upstream_roi = None
@@ -88,7 +90,27 @@ class SpecifiedLocation(BatchFilter):
         # shift to center
         center_shift = spec.roi.get_shape()/2 + spec.roi.get_offset()
 
-        self.specified_shift = self._get_next_shift(center_shift)
+        if self.skip_out_of_bounds:
+            request_fits = False
+            while not request_fits:
+                request_fits = True
+                # shift request ROIs
+                self.specified_shift = self._get_next_shift(center_shift)
+
+                for specs_type in [request.volume_specs, request.points_specs]:
+                    for (data_type, spec) in specs_type.items():
+                        roi = spec.roi.shift(self.specified_shift)
+                        if not self.upstream_spec[data_type].roi.contains(roi):
+                            request_fits = False
+                            logger.warning("selected roi {} doesn't fit in upstream provider {}.\n \
+    Skipping this location...".format(roi, self.upstream_spec[data_type].roi))
+                            break;
+                    if not request_fits:
+                        break;
+            logger.info("{}'th shift selected: {}".format(self.loc_i, self.specified_shift))
+        else:
+            self.specified_shift = self._get_next_shift(center_shift)
+
 
         # Set shift for all requests
         for specs_type in [request.volume_specs, request.points_specs]:
@@ -96,7 +118,6 @@ class SpecifiedLocation(BatchFilter):
                 roi = spec.roi.shift(self.specified_shift)
                 specs_type[data_type].roi = roi
 
-        logger.debug("{}'th shift selected: {}".format(self.loc_i, self.specified_shift))
 
     def process(self, batch, request):
         # reset ROIs to request
@@ -105,6 +126,7 @@ class SpecifiedLocation(BatchFilter):
             if self.extra_data is not None:
                 batch.volumes[volume_type].attrs['specified_location_extra_data'] =\
                  self.extra_data[self.loc_i]
+                logger.info('Loc: %s', self.extra_data[self.loc_i])
 
         for (points_type, spec) in request.points_specs.items():
             batch.points[points_type].spec.roi = spec.roi
