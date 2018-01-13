@@ -9,7 +9,7 @@ from .batch_filter import BatchFilter
 logger = logging.getLogger(__name__)
 
 class AddLongRangeAffinities(BatchFilter):
-     '''Add affinities volumes to the batch defined by a neighborhood and two volumes.
+    '''Add affinities volumes to the batch defined by a neighborhood and two volumes.
 
     Affinity values are defined as the bitwise-and operation applied on each voxel and
     entry in the neighborhood list, i.e., for each voxel and each neighbor of this voxel.
@@ -98,35 +98,35 @@ class AddLongRangeAffinities(BatchFilter):
             self.skip_next = True
             return
 
-        requested_roi_1 = request[self.affinity_presyn_volume].roi
-        requested_roi_2 = request[self.affinity_postsyn_volume].roi
+        requested_roi_presyn = request[self.affinity_presyn_volume].roi
+        requested_roi_postsyn = request[self.affinity_postsyn_volume].roi
 
         del request[self.affinity_presyn_volume]
         del request[self.affinity_postsyn_volume]
 
-        needed_roi_volume_1 = requested_roi_1.grow(self.padding, self.padding)
-        needed_roi_volume_2 = requested_roi_2.grow(self.padding, self.padding)
+        needed_roi_volume_presyn = requested_roi_presyn.grow(self.padding, self.padding)
+        needed_roi_volume_postsyn = requested_roi_postsyn.grow(self.padding, self.padding)
 
         if not self.presyn_volume in request:
             logger.debug("Adding downstream request for necessary volume %s"%self.presyn_volume)
-            request.add(self.presyn_volume, needed_roi_volume_1, voxel_size=(40,4,4))
+            request.add(self.presyn_volume, needed_roi_volume_presyn, voxel_size=(40,4,4))
         else:
             logger.debug("downstream %s request: "%self.presyn_volume +\
              str(request[self.presyn_volume].roi))
 
             request[self.presyn_volume].roi = \
-             request[self.presyn_volume].roi.union(needed_roi_volume_1)
+             request[self.presyn_volume].roi.union(needed_roi_volume_presyn)
 
 
         if not self.postsyn_volume in request:
             logger.debug("Adding downstream request for necessary volume %s"%self.postsyn_volume)
-            request.add(self.postsyn_volume, needed_roi_volume_2, voxel_size=(40,4,4))
+            request.add(self.postsyn_volume, needed_roi_volume_postsyn, voxel_size=(40,4,4))
         else:
             logger.debug("downstream %s request: "%self.postsyn_volume +\
                  str(request[self.postsyn_volume].roi))
 
             request[self.postsyn_volume].roi = \
-                request[self.postsyn_volume].roi.union(needed_roi_volume_2)
+                request[self.postsyn_volume].roi.union(needed_roi_volume_postsyn)
 
 
         logger.debug("upstream %s request: "%self.presyn_volume +\
@@ -138,17 +138,17 @@ class AddLongRangeAffinities(BatchFilter):
     def process(self, batch, request):
 
         if not self.skip_next:
-            full_vol1 = batch.volumes[self.presyn_volume]
-            full_vol2 = batch.volumes[self.postsyn_volume]
+            full_vol_pre = batch.volumes[self.presyn_volume]
+            full_vol_post = batch.volumes[self.postsyn_volume]
 
-            # Both full_vol1 should match
-            assert full_vol1.spec.dtype == full_vol2.spec.dtype,\
+            # Both full_vol_pre should match
+            assert full_vol_pre.spec.dtype == full_vol_post.spec.dtype,\
             "data type of volume 1(%s) and volume 2(%s) should match"%\
-            (full_vol1.spec.dtype, full_vol2.spec.dtype)
+            (full_vol_pre.spec.dtype, full_vol_post.spec.dtype)
 
-            assert full_vol1.spec.voxel_size == full_vol2.spec.voxel_size,\
+            assert full_vol_pre.spec.voxel_size == full_vol_post.spec.voxel_size,\
             "data type of volume 1(%s) and volume 2(%s) should match"%\
-            (full_vol1.spec.voxel_size,full_vol2.spec.voxel_size)
+            (full_vol_pre.spec.voxel_size,full_vol_post.spec.voxel_size)
 
             # do nothing if no gt affinities were requested
             if self.skip_next:
@@ -157,20 +157,20 @@ class AddLongRangeAffinities(BatchFilter):
 
             logger.debug("computing ground-truth affinities from labels")
 
-            # Calculate affinities 1: from vol2 onto vol1
+            # Calculate affinities 1: from vol_post onto vol_pre
 
             # Initialize affinity map
             request_vol = request[self.affinity_presyn_volume]
             affinity_map = np.zeros(
                 (len(self.affinity_neighborhood),) +
                 tuple(request_vol.roi.get_shape()/request_vol.voxel_size),
-                 dtype=full_vol1.spec.dtype)
+                 dtype=full_vol_pre.spec.dtype)
 
             # calculate affinities vol 1
-            vol1 = full_vol1.crop(request_vol.roi)
+            vol_pre = full_vol_pre.crop(request_vol.roi)
             for i, vector in enumerate(self.affinity_neighborhood):
-                vol2 = full_vol2.crop(request_vol.roi.shift(tuple(-vector)))
-                affinity_map[i,:,:,:] = np.bitwise_and(vol1.data, vol2.data)
+                vol_post = full_vol_post.crop(request_vol.roi.shift(tuple(-vector)))
+                affinity_map[i,:,:,:] = np.bitwise_and(vol_pre.data, vol_post.data)
 
             if not self.output_with_IDs:
                 affinity_map[np.where(affinity_map != 0)] = 1
@@ -181,20 +181,20 @@ class AddLongRangeAffinities(BatchFilter):
             batch.volumes[self.affinity_presyn_volume].attrs['affinity_neighborhood'] =\
              self.affinity_neighborhood
 
-            # Calculate affinities 2: from vol1 onto vol2
+            # Calculate affinities 2: from vol_pre onto vol_post
 
             # Initialize affinity map
             request_vol = request[self.affinity_postsyn_volume]
             affinity_map = np.zeros(
                 (len(self.affinity_neighborhood),) +
                 tuple(request_vol.roi.get_shape()/request_vol.voxel_size),
-                 dtype=full_vol1.spec.dtype)
+                 dtype=full_vol_pre.spec.dtype)
 
             # calculate affinities vol 2
-            vol2 = full_vol2.crop(request_vol.roi)
+            vol_post = full_vol_post.crop(request_vol.roi)
             for i, vector in enumerate(self.affinity_neighborhood):
-                vol1 = full_vol1.crop(request_vol.roi.shift(tuple(vector)))
-                affinity_map[i,:,:,:] = np.bitwise_and(vol1.data, vol2.data)
+                vol_pre = full_vol_pre.crop(request_vol.roi.shift(tuple(vector)))
+                affinity_map[i,:,:,:] = np.bitwise_and(vol_pre.data, vol_post.data)
 
             if not self.output_with_IDs:
                 affinity_map[np.where(affinity_map != 0)] = 1
