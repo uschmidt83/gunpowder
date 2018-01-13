@@ -8,6 +8,7 @@ from gunpowder.batch_request import BatchRequest
 from gunpowder.coordinate import Coordinate
 from gunpowder.roi import Roi
 from gunpowder.volume import VolumeTypes
+from gunpowder.points_spec import PointsSpec
 from .batch_filter import BatchFilter
 
 logger = logging.getLogger(__name__)
@@ -105,8 +106,8 @@ class RandomLocation(BatchFilter):
         else:
             lcm_voxel_size = None
 
-
         for identifier, spec in request.items():
+
             request_roi = spec.roi
             if identifier in self.upstream_spec:
                 provided_roi = self.upstream_spec[identifier].roi
@@ -124,8 +125,8 @@ class RandomLocation(BatchFilter):
         logger.debug("valid shifts for request in " + str(shift_roi))
 
         assert shift_roi is not None and shift_roi.size() > 0, (
-                "Can not satisfy batch request, no location covers all "
-                "requested ROIs.")
+                "Shift Roi (%s) cannot satisfy batch request, no location covers all "
+                "requested ROIs."%(shift_roi))
 
         if lcm_voxel_size is not None:
             lcm_shift_roi = shift_roi/lcm_voxel_size
@@ -146,14 +147,17 @@ class RandomLocation(BatchFilter):
             good_location_found_for_mask, good_location_found_for_points = False, False
             if self.focus_points_type is not None:
 
-                focused_points_roi = request.points_spec[self.focus_points_type].roi
+                focused_points_roi = request[self.focus_points_type].roi
                 focused_points_offset = focused_points_roi.get_offset()
                 focused_points_shape  = focused_points_roi.get_shape()
 
                 # prefetch points in roi of focus_points_type
                 request_for_focused_pointstype = BatchRequest()
-                request_for_focused_pointstype.points_spec[self.focus_points_type] = PointsSpec(roi=focused_points_roi.shift(random_shift))
-                batch_of_points    = self.get_upstream_provider().request_batch(request_for_focused_pointstype)
+                request_for_focused_pointstype[self.focus_points_type] = PointsSpec(roi=focused_points_roi.shift(random_shift))
+
+                # NOTE: If any nodes are placed between this node and the source
+                # this function call might cause bugs
+                batch_of_points = self.get_upstream_provider().request_batch(request_for_focused_pointstype)
                 point_ids_in_batch = batch_of_points.points[self.focus_points_type].data.keys()
 
                 if len(point_ids_in_batch) > 0:
@@ -180,10 +184,8 @@ class RandomLocation(BatchFilter):
                         if trial_nr == max_trials:
                             good_location_found_for_points = False
                             break
-
                 else:
                     good_location_found_for_points = False
-
             else:
                 good_location_found_for_points = True
 
@@ -240,4 +242,4 @@ class RandomLocation(BatchFilter):
 
     def lcm(self, a, b):
 
-        return 
+        return
