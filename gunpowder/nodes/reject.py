@@ -30,13 +30,16 @@ class Reject(BatchFilter):
         assert self.mask_volume_type in request, "Reject can only be used if a GT mask is requested"
 
         have_good_batch = False
-        while not have_good_batch:
+        accept_even_if_empty = False
+
+        while not (have_good_batch or accept_even_if_empty):
 
             batch = self.upstream_provider.request_batch(request)
             mask_ratio = batch.volumes[self.mask_volume_type].data.mean()
             have_good_batch = mask_ratio>=self.min_masked
+            accept_even_if_empty = (np.random.rand() <= self.reject_probability )
 
-            if not have_good_batch and (np.random.rand() > self.reject_probability):
+            if not (have_good_batch or accept_even_if_empty):
                 logger.warning(
                     "reject batch with mask ratio %f at "%mask_ratio +
                     str(batch.volumes[self.mask_volume_type].spec.roi))
