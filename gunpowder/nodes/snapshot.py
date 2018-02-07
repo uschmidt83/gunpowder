@@ -106,7 +106,11 @@ class Snapshot(BatchFilter):
 
                     # if volume has attributes, add them to the dataset
                     for attribute_name, attribute in volume.attrs.items():
-                        dataset.attrs[attribute_name] = attribute
+                        if attribute_name == 'specified_location_extra_data':
+                            for key, val in attribute.iteritems():
+                                dataset.attrs[key] = val
+                        else:
+                            dataset.attrs[attribute_name] = attribute
 
                 if batch.loss is not None:
                     f['/'].attrs['loss'] = batch.loss
