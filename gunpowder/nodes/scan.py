@@ -63,11 +63,14 @@ class Scan(BatchFilter):
         if self.num_workers > 1:
             self.workers.stop()
 
-    def provide(self, request):
+    def provide(self, request, dummy_request=None):
 
         empty_request = (len(request) == 0)
         if empty_request:
-            scan_spec = self.spec
+            if dummy_request:
+                scan_spec = dummy_request
+            else:
+                scan_spec = self.spec
         else:
             scan_spec = request
 

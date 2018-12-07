@@ -31,6 +31,7 @@ from .rasterize_points import RasterizationSettings, RasterizePoints
 from .reject import Reject
 from .renumber_connected_components import RenumberConnectedComponents
 from .scan import Scan
+from .daisy_scan import DaisyScan
 from .simple_augment import SimpleAugment
 from .snapshot import Snapshot
 from .specified_location import SpecifiedLocation
