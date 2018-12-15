@@ -168,7 +168,7 @@ class BatchProvider(object):
             provided_roi = provided_spec.roi
             request_roi = request_spec.roi
 
-            if provided_roi is not None:
+            if provided_roi is not None and request_roi is not None:
                 assert provided_roi.contains(request_roi), "%s: %s's ROI %s outside of my ROI %s"%(self.name(), key, request_roi, provided_roi)
 
             if isinstance(key, ArrayKey):
@@ -195,19 +195,20 @@ class BatchProvider(object):
 
             assert array_key in batch.arrays, "%s requested, but %s did not provide it."%(array_key,self.name())
             array = batch.arrays[array_key]
-            assert array.spec.roi == request_spec.roi, "%s ROI %s requested, but ROI %s provided by %s."%(
-                    array_key,
-                    request_spec.roi,
-                    array.spec.roi,
-                    self.name()
-            )
+            if array.spec.roi is not None and request_spec.roi is not None:
+                assert array.spec.roi == request_spec.roi, "%s ROI %s requested, but ROI %s provided by %s."%(
+                        array_key,
+                        request_spec.roi,
+                        array.spec.roi,
+                        self.name()
+                )
             assert array.spec.voxel_size == self.spec[array_key].voxel_size, (
                 "voxel size of %s announced, but %s "
                 "delivered for %s"%(
                     self.spec[array_key].voxel_size,
                     array.spec.voxel_size,
                     array_key))
-            # ensure that the spatial dimensions are the same (other dimensions 
+            # ensure that the spatial dimensions are the same (other dimensions
             # on top are okay, e.g., for affinities)
             if request_spec.roi is not None:
                 dims = request_spec.roi.dims()
