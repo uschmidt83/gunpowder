@@ -93,6 +93,8 @@ class ArrayKey(Freezable):
     '''
 
     def __init__(self, identifier):
+        if isinstance(identifier, ArrayKey):
+            identifier = identifier.identifier
         self.identifier = identifier
         self.hash = hash(identifier)
         self.freeze()
