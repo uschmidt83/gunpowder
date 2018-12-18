@@ -93,13 +93,15 @@ class ArrayKey(Freezable):
     '''
 
     def __init__(self, identifier):
+        # TODO: make this a proper singleton
         if isinstance(identifier, ArrayKey):
             identifier = identifier.identifier
         self.identifier = identifier
         self.hash = hash(identifier)
         self.freeze()
-        logger.debug("Registering array key %s", self)
-        setattr(ArrayKeys, self.identifier, self)
+        if not hasattr(ArrayKeys, self.identifier):
+            logger.debug("Registering array key %s", self)
+            setattr(ArrayKeys, self.identifier, self)
 
     def __eq__(self, other):
         return hasattr(other, 'identifier') and self.identifier == other.identifier

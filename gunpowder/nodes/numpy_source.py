@@ -16,9 +16,14 @@ logger = logging.getLogger(__name__)
 class NumpySource(BatchProvider):
 
     def __init__(self, array_dict, voxel_size=None, interpolatable=None):
-        self.array_dict = array_dict
-        self.voxel_size = voxel_size
-        self.interpolatable = interpolatable
+        def keyify(d):
+            try:
+                return {ArrayKey(k):v for k,v in d.items()} if d is not None else None
+            except AttributeError:
+                return d
+        self.array_dict = keyify(array_dict)
+        self.voxel_size = keyify(voxel_size)
+        self.interpolatable = keyify(interpolatable)
 
 
     def _guess_interpolatable(self,array_key, dtype):
@@ -56,7 +61,7 @@ class NumpySource(BatchProvider):
                     interpolatable = self._guess_interpolatable(key,data.dtype)
 
             self.provides(
-                ArrayKey(key),
+                key,
                 ArraySpec(
                     roi            = Roi((0,)*data.ndim, data.shape),
                     dtype          = data.dtype,
@@ -77,7 +82,7 @@ class NumpySource(BatchProvider):
             assert request_spec.dtype is None or request_spec.dtype==spec.dtype, "dtype mismatch"
             # print(f"provider spec = {spec}")
             # print(f"request  spec = {request_spec}")
-            array = Array(self.array_dict[key.identifier], spec)
+            array = Array(self.array_dict[key], spec)
             if request_spec.roi is not None and request_spec.roi != spec.roi:
                 array = array.crop(request_spec.roi, copy=True)
             batch.arrays[key] = array
