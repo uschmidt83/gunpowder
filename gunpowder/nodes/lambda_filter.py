@@ -5,14 +5,15 @@ logger = logging.getLogger(__name__)
 
 class Lambda(BatchFilter):
 
-    def __init__(self, process, prepare=None, setup=None, teardown=None):
+    def __init__(self, process=None, prepare=None, setup=None, teardown=None):
         self._process = process
         self._prepare = prepare
         self._setup = setup
         self._teardown = teardown
 
     def process(self, batch, request):
-        self._process(batch, request)
+        if self._process is not None:
+            self._process(batch, request)
 
     def prepare(self, request):
         if self._prepare is not None:
