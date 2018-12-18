@@ -38,3 +38,4 @@ from .specified_location import SpecifiedLocation
 from .zarr_source import ZarrSource
 from .zarr_write import ZarrWrite
 from .numpy_source import NumpySource
+from .lambda_filter import Lambda
